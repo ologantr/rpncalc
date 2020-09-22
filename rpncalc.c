@@ -35,7 +35,7 @@
 #define STACK_NODE_ELEMENTS_NUM 10
 
 enum rpn_op { SUM = 0, SUB, MUL, DIV };
-enum rpn_type { DOUBLE = 0, OP };
+enum rpn_type { DOUBLE = 0, OP, DROP, EXIT };
 
 struct rpn_obj
 {
@@ -191,11 +191,21 @@ static int parse_buf(char *buf, struct rpn_obj *obj)
                 return -1;
 
         else if (strncmp(buf, "quit", STDIN_BUF_SIZE) == 0)
-                return 2;
+        {
+                obj->t = EXIT;
+                return 0;
+        }
+
+        else if (strncmp(buf, "drop", STDIN_BUF_SIZE) == 0)
+        {
+                obj->t = DROP;
+                return 0;
+        }
 
         /* valid inputs: +, -, *, / and a number */
         else if (*buf == '+' | *buf == '-' | *buf == '*' | *buf == '/')
         {
+                /* things like +123, -34-5 are not valid */
                 if (strlen(buf) > 1)
                         return -1;
 
@@ -216,7 +226,7 @@ static int parse_buf(char *buf, struct rpn_obj *obj)
                         break;
                 }
 
-                return 1;
+                return 0;
         }
         else
         {
@@ -260,20 +270,20 @@ int main(void)
                 if (retval == -1)
                         goto end;
 
-                if (retval == 2)
-                {
-                        stack_destroy(s);
-                        return 0;
-                }
-
                 switch(obj.t)
                 {
                 case DOUBLE:
                         stack_insert(s, obj.data.val);
-                        goto end;
+                        break;
                 case OP:
                         exec_op(s, obj.data.op);
-                        goto end;
+                        break;
+                case DROP:
+                        stack_pop(s);
+                        break;
+                case EXIT:
+                        stack_destroy(s);
+                        return 0;
                 }
         end:
                 stack_print(s);
