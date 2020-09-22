@@ -107,6 +107,7 @@ static void stack_insert(struct stack *s, double k)
         {
                 /* the last node is full, allocate a new one */
                 struct stack_node *n = stack_alloc_node();
+                n->ptr = 0;
                 n->prev = s->last;
                 n->next = NULL;
                 s->last->next = n;
