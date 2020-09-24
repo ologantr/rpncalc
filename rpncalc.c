@@ -162,13 +162,13 @@ static void stack_print(struct stack *s)
 
 static void exec_op(struct stack *s, enum rpn_op op)
 {
-        double x, y, res, tmp;
+        double x, y, res;
         if (s->count <= 1) return;
 
-        stack_pop(s, &tmp);
-        x = tmp;
-        stack_pop(s, &tmp);
-        y = tmp;
+        stack_pop(s, &res);
+        x = res;
+        stack_pop(s, &res);
+        y = res;
 
         switch(op)
         {
