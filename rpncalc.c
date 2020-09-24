@@ -228,10 +228,18 @@ static int parse_buf(char *buf, struct rpn_obj *obj)
 
                 return 0;
         }
+
         else
         {
-                for (int i = 0; i < (int) strlen(buf); ++i)
+                for (int i = 0, p = 0; i < (int) strlen(buf); ++i)
                 {
+                        if (buf[i] == '.' && !p)
+                        {
+                                /* there is a dot, should be no others */
+                                p = 1;
+                                continue;
+                        }
+
                         if (!isdigit(buf[i]))
                                 return -1;
                 }
