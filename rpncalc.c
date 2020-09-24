@@ -119,9 +119,9 @@ static void stack_insert(struct stack *s, double k)
         return;
 }
 
-static double* stack_pop(struct stack *s)
+static void stack_pop(struct stack *s, double *ret)
 {
-        if (s->count == 0) return NULL;
+        if (s->count == 0) return;
 
         if (s->last->ptr == 0)
         {
@@ -132,7 +132,12 @@ static double* stack_pop(struct stack *s)
         }
 
         --(s->count);
-        return &(s->last->val[--(s->last->ptr)]);
+
+        if (ret == NULL)
+                /* no need to save the value */
+                --(s->last->ptr);
+        else
+                *ret = s->last->val[--(s->last->ptr)];
 }
 
 static void stack_destroy(struct stack *s)
@@ -146,7 +151,6 @@ static void stack_destroy(struct stack *s)
         }
 
         free(s);
-        return;
 }
 
 static void stack_print(struct stack *s)
@@ -158,13 +162,13 @@ static void stack_print(struct stack *s)
 
 static void exec_op(struct stack *s, enum rpn_op op)
 {
-        double x, y, res, *tmp;
+        double x, y, res, tmp;
         if (s->count <= 1) return;
 
-        tmp = stack_pop(s);
-        x = *tmp;
-        tmp = stack_pop(s);
-        y = *tmp;
+        stack_pop(s, &tmp);
+        x = tmp;
+        stack_pop(s, &tmp);
+        y = tmp;
 
         switch(op)
         {
@@ -287,7 +291,7 @@ int main(void)
                         exec_op(s, obj.data.op);
                         break;
                 case DROP:
-                        stack_pop(s);
+                        stack_pop(s, NULL);
                         break;
                 case EXIT:
                         stack_destroy(s);
