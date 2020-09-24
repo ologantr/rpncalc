@@ -126,9 +126,11 @@ static void stack_pop(struct stack *s, double *ret)
         if (s->last->ptr == 0)
         {
                 /* the last node is empty, free it and look to the previous one */
+                struct stack_node *del = s->last;
+
                 s->last->prev->next = NULL;
                 s->last = s->last->prev;
-                free(s->last);
+                free(del);
         }
 
         --(s->count);
