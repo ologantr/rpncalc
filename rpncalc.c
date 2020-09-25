@@ -44,6 +44,7 @@ struct rpn_cmd
                 double val;
                 enum rpn_op op;
         } data;
+        int op_times;
         enum rpn_type t;
 };
 
@@ -218,11 +219,22 @@ static int parse_buf(char *buf, struct rpn_cmd *cmd)
         /* valid inputs: +, -, *, / and a number */
         else if (*buf == '+' | *buf == '-' | *buf == '*' | *buf == '/')
         {
-                /* things like +123, -34-5 are not valid */
+                int times = 1;
+
+                /* OP could be in the form:
+                 * + for a single plus, or +3 for 3 adds in sequence */
                 if (strlen(buf) > 1)
-                        return -1;
+                {
+                        for (int i = 1; i < (int) strlen(buf); ++i)
+                                if (!isdigit(buf[i]))
+                                        return -1;
+
+                        times = (int) strtol(buf + 1, NULL, 10);
+                }
 
                 cmd->t = OP;
+                cmd->op_times = times;
+
                 switch(*buf)
                 {
                 case '+':
@@ -297,7 +309,8 @@ int main(void)
                         stack_insert(s, cmd.data.val);
                         break;
                 case OP:
-                        exec_op(s, cmd.data.op);
+                        for (int i = 0; i < cmd.op_times; ++i)
+                                exec_op(s, cmd.data.op);
                         break;
                 case DROP:
                         stack_pop(s, NULL);
