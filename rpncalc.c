@@ -37,6 +37,15 @@
 enum rpn_op { SUM = 0, SUB, MUL, DIV };
 enum rpn_type { DOUBLE = 0, OP, DROP, EXIT };
 
+struct
+{
+        char cmd[10];
+        enum rpn_type cmd_type;
+} rpn_commands[] = { { "quit", EXIT },
+                     { "drop", DROP } };
+
+#define NCMD (int) (sizeof(rpn_commands) / sizeof(rpn_commands[0]))
+
 struct rpn_cmd
 {
         union
@@ -207,20 +216,17 @@ static int parse_buf(char *buf, struct rpn_cmd *cmd)
         if (*buf == 0)
                 return -1;
 
-        else if (strncmp(buf, "quit", STDIN_BUF_SIZE) == 0)
+        for (int i = 0; i < NCMD; ++i)
         {
-                cmd->t = EXIT;
-                return 0;
-        }
-
-        else if (strncmp(buf, "drop", STDIN_BUF_SIZE) == 0)
-        {
-                cmd->t = DROP;
-                return 0;
+                if (strncmp(buf, rpn_commands[i].cmd, STDIN_BUF_SIZE) == 0)
+                {
+                        cmd->t = rpn_commands[i].cmd_type;
+                        return 0;
+                }
         }
 
         /* valid inputs: +, -, *, / and a number */
-        else if (*buf == '+' | *buf == '-' | *buf == '*' | *buf == '/')
+        if (*buf == '+' | *buf == '-' | *buf == '*' | *buf == '/')
         {
                 int times = 1;
 
