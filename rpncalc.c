@@ -35,14 +35,15 @@
 #define STACK_NODE_ELEMENTS_NUM 10
 
 enum rpn_op { SUM = 0, SUB, MUL, DIV };
-enum rpn_type { DOUBLE = 0, OP, DROP, EXIT };
+enum rpn_type { DOUBLE = 0, OP, DROP, CLEAR, EXIT };
 
 struct
 {
         char cmd[10];
         enum rpn_type cmd_type;
 } rpn_commands[] = { { "quit", EXIT },
-                     { "drop", DROP } };
+                     { "drop", DROP },
+                     { "clear", CLEAR } };
 
 #define NCMD (int) (sizeof(rpn_commands) / sizeof(rpn_commands[0]))
 
@@ -150,6 +151,27 @@ static void stack_pop(struct stack *s, double *ret)
                 --(s->last->ptr);
         else
                 *ret = s->last->val[--(s->last->ptr)];
+}
+
+static void stack_clear(struct stack *s)
+{
+        /* must free every node other than the first */
+        struct stack_node *ptr_1 = s->first->next, *ptr_2 = NULL;
+
+        if (ptr_1 != NULL)
+        {
+                ptr_2 = ptr_1->next;
+
+                while (ptr_2 != NULL)
+                {
+                        free(ptr_1);
+                        ptr_1 = ptr_2;
+                        ptr_2 = ptr_2->next;
+                }
+        }
+
+        s->first->ptr = 0;
+        s->first->next = NULL;
 }
 
 static void stack_destroy(struct stack *s)
@@ -325,6 +347,9 @@ int main(void)
                         break;
                 case DROP:
                         stack_pop(s, NULL);
+                        break;
+                case CLEAR:
+                        stack_clear(s);
                         break;
                 case EXIT:
                         stack_destroy(s);
