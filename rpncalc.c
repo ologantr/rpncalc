@@ -144,12 +144,13 @@ static void stack_pop(struct stack *s, double *ret)
 
 static void stack_destroy(struct stack *s)
 {
-        struct stack_node *ptr = s->first;
+        struct stack_node *ptr_1 = s->first, *ptr_2 = s->first->next;
 
-        while (ptr != NULL)
+        while (ptr_2 != NULL)
         {
-                free(ptr);
-                ptr = ptr->next;
+                free(ptr_1);
+                ptr_1 = ptr_2;
+                ptr_2 = ptr_2->next;
         }
 
         free(s);
