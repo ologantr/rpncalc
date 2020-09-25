@@ -185,6 +185,12 @@ static void exec_op(struct stack *s, enum rpn_op op)
                 res = x * y;
                 break;
         case DIV:
+                if (x == 0)
+                {
+                        puts("error - division by zero");
+                        return;
+                }
+
                 res = y / x;
                 break;
         }
