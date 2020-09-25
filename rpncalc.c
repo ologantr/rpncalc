@@ -37,7 +37,7 @@
 enum rpn_op { SUM = 0, SUB, MUL, DIV };
 enum rpn_type { DOUBLE = 0, OP, DROP, EXIT };
 
-struct rpn_obj
+struct rpn_cmd
 {
         union
         {
@@ -198,20 +198,20 @@ static void exec_op(struct stack *s, enum rpn_op op)
         stack_insert(s, res);
 }
 
-static int parse_buf(char *buf, struct rpn_obj *obj)
+static int parse_buf(char *buf, struct rpn_cmd *cmd)
 {
         if (*buf == 0)
                 return -1;
 
         else if (strncmp(buf, "quit", STDIN_BUF_SIZE) == 0)
         {
-                obj->t = EXIT;
+                cmd->t = EXIT;
                 return 0;
         }
 
         else if (strncmp(buf, "drop", STDIN_BUF_SIZE) == 0)
         {
-                obj->t = DROP;
+                cmd->t = DROP;
                 return 0;
         }
 
@@ -222,20 +222,20 @@ static int parse_buf(char *buf, struct rpn_obj *obj)
                 if (strlen(buf) > 1)
                         return -1;
 
-                obj->t = OP;
+                cmd->t = OP;
                 switch(*buf)
                 {
                 case '+':
-                        obj->data.op = SUM;
+                        cmd->data.op = SUM;
                         break;
                 case '-':
-                        obj->data.op = SUB;
+                        cmd->data.op = SUB;
                         break;
                 case '*':
-                        obj->data.op = MUL;
+                        cmd->data.op = MUL;
                         break;
                 case '/':
-                        obj->data.op = DIV;
+                        cmd->data.op = DIV;
                         break;
                 }
 
@@ -257,8 +257,8 @@ static int parse_buf(char *buf, struct rpn_obj *obj)
                                 return -1;
                 }
 
-                obj->t = DOUBLE;
-                obj->data.val = strtod(buf, NULL);
+                cmd->t = DOUBLE;
+                cmd->data.val = strtod(buf, NULL);
         }
 
         return 0;
@@ -269,7 +269,7 @@ int main(void)
         struct stack *s = stack_init();
         char buf[STDIN_BUF_SIZE];
         int retval;
-        struct rpn_obj obj;
+        struct rpn_cmd cmd;
 
         for (;;)
         {
@@ -286,18 +286,18 @@ int main(void)
                 /* remove trailing newline */
                 buf[strlen(buf) - 1] = 0;
 
-                retval = parse_buf(buf, &obj);
+                retval = parse_buf(buf, &cmd);
 
                 if (retval == -1)
                         goto end;
 
-                switch(obj.t)
+                switch(cmd.t)
                 {
                 case DOUBLE:
-                        stack_insert(s, obj.data.val);
+                        stack_insert(s, cmd.data.val);
                         break;
                 case OP:
-                        exec_op(s, obj.data.op);
+                        exec_op(s, cmd.data.op);
                         break;
                 case DROP:
                         stack_pop(s, NULL);
