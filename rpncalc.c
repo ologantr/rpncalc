@@ -164,39 +164,42 @@ static void stack_print(struct stack *s)
                         printf("%f\n", ptr->val[i]);
 }
 
-static void exec_op(struct stack *s, enum rpn_op op)
+static void exec_op(struct stack *s, enum rpn_op op, int times)
 {
         double x, y, res;
-        if (s->count <= 1) return;
+        if (s->count <= 1 || times == 0) return;
 
-        stack_pop(s, &res);
-        x = res;
-        stack_pop(s, &res);
-        y = res;
-
-        switch(op)
+        for (int i = 0; i < times; ++i)
         {
-        case SUM:
-                res = x + y;
-                break;
-        case SUB:
-                res = y - x;
-                break;
-        case MUL:
-                res = x * y;
-                break;
-        case DIV:
-                if (x == 0)
+                stack_pop(s, &res);
+                x = res;
+                stack_pop(s, &res);
+                y = res;
+
+                switch(op)
                 {
-                        puts("error - division by zero");
-                        return;
+                case SUM:
+                        res = x + y;
+                        break;
+                case SUB:
+                        res = y - x;
+                        break;
+                case MUL:
+                        res = x * y;
+                        break;
+                case DIV:
+                        if (x == 0)
+                        {
+                                puts("error - division by zero");
+                                return;
+                        }
+
+                        res = y / x;
+                        break;
                 }
 
-                res = y / x;
-                break;
+                stack_insert(s, res);
         }
-
-        stack_insert(s, res);
 }
 
 static int parse_buf(char *buf, struct rpn_cmd *cmd)
@@ -309,8 +312,10 @@ int main(void)
                         stack_insert(s, cmd.data.val);
                         break;
                 case OP:
-                        for (int i = 0; i < cmd.op_times; ++i)
-                                exec_op(s, cmd.data.op);
+                        if (cmd.op_times == 0)
+                                exec_op(s, cmd.data.op, s->count - 1);
+                        else
+                                exec_op(s, cmd.data.op, cmd.op_times);
                         break;
                 case DROP:
                         stack_pop(s, NULL);
