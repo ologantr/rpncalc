@@ -233,11 +233,59 @@ static void exec_op(struct stack *s, enum rpn_op op, int times)
         }
 }
 
+static void cmd_op(struct rpn_cmd *cmd, int times, char f_char_buf)
+{
+        cmd->t = OP;
+        cmd->op_times = times;
+
+        switch(f_char_buf)
+        {
+        case '+':
+                cmd->data.op = SUM;
+                break;
+        case '-':
+                cmd->data.op = SUB;
+                break;
+        case '*':
+                cmd->data.op = MUL;
+                break;
+        case '/':
+                cmd->data.op = DIV;
+                break;
+        }
+}
+
+static void cmd_double(struct rpn_cmd *cmd, char *buf)
+{
+        cmd->t = DOUBLE;
+        cmd->data.val = strtod(buf, NULL);
+}
+
+static int is_valid_double(char *buf)
+{
+        for (int i = 0, p = 0; i < (int) strlen(buf); ++i)
+        {
+                if (buf[i] == '.' && !p)
+                {
+                        /* there is a dot, should be no others */
+                        p = 1;
+                        continue;
+                }
+
+                if (!isdigit(buf[i]))
+                        return 0;
+        }
+
+        return 1;
+}
+
 static int parse_buf(char *buf, struct rpn_cmd *cmd)
 {
+        /* the user pressed only enter */
         if (*buf == 0)
                 return -1;
 
+        /* check for a command like drop and quit */
         for (int i = 0; i < NCMD; ++i)
         {
                 if (strncmp(buf, rpn_commands[i].cmd, STDIN_BUF_SIZE) == 0)
@@ -247,61 +295,41 @@ static int parse_buf(char *buf, struct rpn_cmd *cmd)
                 }
         }
 
-        /* valid inputs: +, -, *, / and a number */
-        if (*buf == '+' | *buf == '-' | *buf == '*' | *buf == '/')
+        /* check for both an op and a signed number */
+        if (*buf == '+' || *buf == '-')
         {
-                int times = 1;
-
-                /* OP could be in the form:
-                 * + for a single plus, or +3 for 3 adds in sequence */
                 if (strlen(buf) > 1)
                 {
-                        for (int i = 1; i < (int) strlen(buf); ++i)
-                                if (!isdigit(buf[i]))
-                                        return -1;
-
-                        times = (int) strtol(buf + 1, NULL, 10);
+                        /* could be a positive/negative number
+                         * prefixed with sign, check the input */
+                        if (is_valid_double(buf + 1))
+                                cmd_double(cmd, buf);
                 }
-
-                cmd->t = OP;
-                cmd->op_times = times;
-
-                switch(*buf)
+                else
                 {
-                case '+':
-                        cmd->data.op = SUM;
-                        break;
-                case '-':
-                        cmd->data.op = SUB;
-                        break;
-                case '*':
-                        cmd->data.op = MUL;
-                        break;
-                case '/':
-                        cmd->data.op = DIV;
-                        break;
+                        /* this is an op */
+                        cmd_op(cmd, 1, *buf);
                 }
+        }
 
-                return 0;
+        /* check for the remaining ops */
+        else if (*buf == '*' || *buf == '/')
+        {
+                /* check for non-valid things like *3 */
+                if (strlen(buf) > 1)
+                        return -1;
+
+                /* here we are sure that this is an op */
+                cmd_op(cmd, 1, *buf);
         }
 
         else
         {
-                for (int i = 0, p = 0; i < (int) strlen(buf); ++i)
-                {
-                        if (buf[i] == '.' && !p)
-                        {
-                                /* there is a dot, should be no others */
-                                p = 1;
-                                continue;
-                        }
-
-                        if (!isdigit(buf[i]))
-                                return -1;
-                }
-
-                cmd->t = DOUBLE;
-                cmd->data.val = strtod(buf, NULL);
+                /* here could only be a non prefixed number, check it */
+                if (is_valid_double(buf))
+                        cmd_double(cmd, buf);
+                else
+                        return -1;
         }
 
         return 0;
