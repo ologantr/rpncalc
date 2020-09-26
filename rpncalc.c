@@ -112,7 +112,7 @@ static struct stack* stack_init(void)
         return s;
 }
 
-static void stack_insert(struct stack *s, double k)
+static void stack_push(struct stack *s, double k)
 {
         if (s->last->ptr == STACK_NODE_ELEMENTS_NUM)
         {
@@ -240,7 +240,7 @@ static void exec_op(struct stack *s, enum rpn_op op, int times)
                         break;
                 }
 
-                stack_insert(s, res);
+                stack_push(s, res);
         }
 }
 
@@ -399,7 +399,7 @@ int main(void)
                 switch(cmd.t)
                 {
                 case DOUBLE:
-                        stack_insert(s, cmd.data.val);
+                        stack_push(s, cmd.data.val);
                         break;
                 case OP:
                         if (cmd.op_times == 0)
