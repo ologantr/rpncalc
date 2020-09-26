@@ -35,14 +35,13 @@
 #define STACK_NODE_ELEMENTS_NUM 10
 
 enum rpn_op { SUM = 0, SUB, MUL, DIV };
-enum rpn_type { DOUBLE = 0, OP, DROP, CLEAR, EXIT };
+enum rpn_type { DOUBLE = 0, OP, DROP, CLEAR };
 
 struct
 {
         char cmd[10];
         enum rpn_type cmd_type;
-} rpn_commands[] = { { "quit", EXIT },
-                     { "drop", DROP },
+} rpn_commands[] = { { "drop", DROP },
                      { "clear", CLEAR } };
 
 #define NCMD (int) (sizeof(rpn_commands) / sizeof(rpn_commands[0]))
@@ -298,18 +297,18 @@ static int is_valid_int(char *buf, int buf_len)
         return 1;
 }
 
-static int parse_buf(char *buf, struct rpn_cmd *cmd)
+static int parse_token(char *tok, struct rpn_cmd *cmd)
 {
-        int buf_len = (int) strlen(buf);
+        int tok_len = (int) strlen(tok);
 
         /* the user pressed only enter */
-        if (!buf_len)
+        if (!tok_len)
                 return -1;
 
         /* check for a command like drop and quit */
         for (int i = 0; i < NCMD; ++i)
         {
-                if (strncmp(buf, rpn_commands[i].cmd, STDIN_BUF_SIZE) == 0)
+                if (strncmp(tok, rpn_commands[i].cmd, STDIN_BUF_SIZE) == 0)
                 {
                         cmd->t = rpn_commands[i].cmd_type;
                         return 0;
@@ -317,55 +316,55 @@ static int parse_buf(char *buf, struct rpn_cmd *cmd)
         }
 
         /* check for both an op and a signed number */
-        if (*buf == '+' || *buf == '-')
+        if (*tok == '+' || *tok == '-')
         {
-                if (buf_len > 1)
+                if (tok_len > 1)
                 {
                         /* could be a positive/negative number
                          * prefixed with sign, check the input */
-                        if (is_valid_double(buf + 1, buf_len - 1))
-                                cmd_double(cmd, buf);
+                        if (is_valid_double(tok + 1, tok_len - 1))
+                                cmd_double(cmd, tok);
                         else
                                 return -1;
                 }
                 else
                 {
                         /* this is an op */
-                        cmd_op(cmd, 1, *buf);
+                        cmd_op(cmd, 1, *tok);
                 }
         }
 
         /* check for the remaining ops */
-        else if (*buf == '*' || *buf == '/')
+        else if (*tok == '*' || *tok == '/')
         {
                 /* check for non-valid things like *3 */
-                if (buf_len > 1)
+                if (tok_len > 1)
                         return -1;
 
                 /* here we are sure that this is an op */
-                cmd_op(cmd, 1, *buf);
+                cmd_op(cmd, 1, *tok);
         }
 
         else
         {
-                int last_char_index = buf_len - 1, times;
+                int last_char_index = tok_len - 1, times;
                 /* here could be a number or a multiple command like 3+, 4- */
-                if (is_valid_double(buf, last_char_index + 1))
+                if (is_valid_double(tok, last_char_index + 1))
                         /* this is a double */
-                        cmd_double(cmd, buf);
+                        cmd_double(cmd, tok);
                 /* if the last char is an op and this is an int,
                  * it is a multiple command */
-                else if ((buf[last_char_index] == '+' ||
-                          buf[last_char_index] == '-' ||
-                          buf[last_char_index] == '*' ||
-                          buf[last_char_index] == '/') &&
-                         /* strlen(buf) - 1 so we do not consider
+                else if ((tok[last_char_index] == '+' ||
+                          tok[last_char_index] == '-' ||
+                          tok[last_char_index] == '*' ||
+                          tok[last_char_index] == '/') &&
+                         /* strlen(tok) - 1 so we do not consider
                           * the final op */
-                         is_valid_int(buf, last_char_index))
+                         is_valid_int(tok, last_char_index))
                 {
                         /* we have a multiple op */
-                        times = (int) strtol(buf, NULL, 10);
-                        cmd_op(cmd, times, buf[last_char_index]);
+                        times = (int) strtol(tok, NULL, 10);
+                        cmd_op(cmd, times, tok[last_char_index]);
                 }
 
                 else
@@ -376,32 +375,16 @@ static int parse_buf(char *buf, struct rpn_cmd *cmd)
         return 0;
 }
 
-int main(void)
+static int exec_line(struct stack *s, char *buf)
 {
-        struct stack *s = stack_init();
-        char buf[STDIN_BUF_SIZE];
-        int retval;
+        char *tok;
         struct rpn_cmd cmd;
+        int ret;
 
-        for (;;)
+        for (tok = strtok(buf, " "); tok; tok = strtok(NULL, " "))
         {
-                printf("> ");
-
-                /* avoid EOF crazy things */
-                if (fgets(buf, STDIN_BUF_SIZE, stdin) == NULL)
-                {
-                        putchar('\n');
-                        stack_destroy(s);
-                        return 0;
-                }
-
-                /* remove trailing newline */
-                buf[strlen(buf) - 1] = 0;
-
-                retval = parse_buf(buf, &cmd);
-
-                if (retval == -1)
-                        goto end;
+                if((ret = parse_token(tok, &cmd)) == -1)
+                        return ret;
 
                 switch(cmd.t)
                 {
@@ -420,11 +403,47 @@ int main(void)
                 case CLEAR:
                         stack_clear(s);
                         break;
-                case EXIT:
+                }
+        }
+
+        return 1;
+}
+
+int main(void)
+{
+        struct stack *s = stack_init();
+        char buf[STDIN_BUF_SIZE];
+        int retval;
+
+        for (;;)
+        {
+                printf("> ");
+
+                /* avoid EOF crazy things */
+                if (fgets(buf, STDIN_BUF_SIZE, stdin) == NULL)
+                {
+                        /* reverse the last '>' */
+                        putchar('\r');
                         stack_destroy(s);
                         return 0;
                 }
-        end:
+
+                /* remove trailing newline */
+                buf[strlen(buf) - 1] = 0;
+
+                retval = exec_line(s, buf);
+
+                switch(retval)
+                {
+                case -1:
+                        puts("error\n");
+                        break;
+                case 0:
+                        return 0;
+                case 1:
+                        break;
+                }
+
                 stack_print(s);
                 *buf = 0;
         }
