@@ -368,6 +368,9 @@ static int parse_buf(char *buf, struct rpn_cmd *cmd)
                         cmd_op(cmd, times, buf[last_char_index]);
                 }
 
+                else
+                        return -1;
+
         }
 
         return 0;
