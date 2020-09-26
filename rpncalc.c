@@ -409,25 +409,25 @@ static int exec_line(struct stack *s, char *buf)
         return 1;
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
         struct stack *s = stack_init();
         char buf[STDIN_BUF_SIZE];
-        int retval;
+        int retval, interactive;
 
-        for (;;)
+        if (argc == 1) interactive = 0;
+        else if (argc == 2 && strcmp(argv[1], "-i") == 0) interactive = 1;
+        else
         {
-                printf("> ");
+                stack_destroy(s);
+                return 0;
+        }
 
-                /* avoid EOF crazy things */
-                if (fgets(buf, STDIN_BUF_SIZE, stdin) == NULL)
-                {
-                        /* reverse the last '>' */
-                        putchar('\r');
-                        stack_destroy(s);
-                        return 0;
-                }
+        if (interactive) printf("> ");
 
+        /* main loop */
+        while(fgets(buf, STDIN_BUF_SIZE, stdin) != NULL)
+        {
                 /* remove trailing newline */
                 buf[strlen(buf) - 1] = 0;
 
@@ -444,7 +444,16 @@ int main(void)
                         break;
                 }
 
-                stack_print(s);
-                *buf = 0;
+                if (interactive)
+                {
+                        stack_print(s);
+                        printf("> ");
+                }
         }
+
+        if (interactive) putchar('\r');
+        else stack_print(s);
+
+        stack_destroy(s);
+        return 0;
 }
