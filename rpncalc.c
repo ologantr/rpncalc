@@ -130,9 +130,9 @@ static void stack_insert(struct stack *s, double k)
         return;
 }
 
-static void stack_pop(struct stack *s, double *ret)
+static int stack_pop(struct stack *s, double *ret)
 {
-        if (s->count == 0) return;
+        if (s->count == 0) return 0;
 
         if (s->last->ptr == 0)
         {
@@ -151,6 +151,8 @@ static void stack_pop(struct stack *s, double *ret)
                 --(s->last->ptr);
         else
                 *ret = s->last->val[--(s->last->ptr)];
+
+        return 1;
 }
 
 static void stack_clear(struct stack *s)
@@ -198,13 +200,22 @@ static void stack_print(struct stack *s)
 static void exec_op(struct stack *s, enum rpn_op op, int times)
 {
         double x, y, res;
-        if (s->count <= 1 || times == 0) return;
+
+        if (times == 0)
+                /* apply the op for all elements */
+                times = s->count - 1;
 
         for (int i = 0; i < times; ++i)
         {
-                stack_pop(s, &res);
+                if (s->count <= 1) return;
+
+                /* check for empty stack */
+                if(!stack_pop(s, &res))
+                        return;
                 x = res;
-                stack_pop(s, &res);
+
+                if(!stack_pop(s, &res))
+                        return;
                 y = res;
 
                 switch(op)
@@ -261,9 +272,9 @@ static void cmd_double(struct rpn_cmd *cmd, char *buf)
         cmd->data.val = strtod(buf, NULL);
 }
 
-static int is_valid_double(char *buf)
+static int is_valid_double(char *buf, int buf_len)
 {
-        for (int i = 0, p = 0; i < (int) strlen(buf); ++i)
+        for (int i = 0, p = 0; i < buf_len; ++i)
         {
                 if (buf[i] == '.' && !p)
                 {
@@ -276,6 +287,14 @@ static int is_valid_double(char *buf)
                         return 0;
         }
 
+        return 1;
+}
+
+static int is_valid_int(char *buf, int buf_len)
+{
+        for (int i = 0; i < buf_len; ++i)
+                if(!isdigit(buf[i]))
+                        return 0;
         return 1;
 }
 
@@ -302,7 +321,7 @@ static int parse_buf(char *buf, struct rpn_cmd *cmd)
                 {
                         /* could be a positive/negative number
                          * prefixed with sign, check the input */
-                        if (is_valid_double(buf + 1))
+                        if (is_valid_double(buf + 1, (int) (strlen(buf) - 1)))
                                 cmd_double(cmd, buf);
                 }
                 else
@@ -325,11 +344,26 @@ static int parse_buf(char *buf, struct rpn_cmd *cmd)
 
         else
         {
-                /* here could only be a non prefixed number, check it */
-                if (is_valid_double(buf))
+                int last_char_index = (int) (strlen(buf) - 1), times;
+                /* here could be a number or a multiple command like 3+, 4- */
+                if (is_valid_double(buf, last_char_index + 1))
+                        /* this is a double */
                         cmd_double(cmd, buf);
-                else
-                        return -1;
+                /* if the last char is an op and this is an int,
+                 * it is a multiple command */
+                else if ((buf[last_char_index] == '+' ||
+                          buf[last_char_index] == '-' ||
+                          buf[last_char_index] == '*' ||
+                          buf[last_char_index] == '/') &&
+                         /* strlen(buf) - 1 so we do not consider
+                          * the final op */
+                         is_valid_int(buf, last_char_index))
+                {
+                        /* we have a multiple op */
+                        times = (int) strtol(buf, NULL, 10);
+                        cmd_op(cmd, times, buf[last_char_index]);
+                }
+
         }
 
         return 0;
