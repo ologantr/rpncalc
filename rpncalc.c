@@ -385,7 +385,7 @@ int main(void)
                 printf("> ");
 
                 /* avoid EOF crazy things */
-                if (fgets(buf, 1024, stdin) == NULL)
+                if (fgets(buf, STDIN_BUF_SIZE, stdin) == NULL)
                 {
                         putchar('\n');
                         stack_destroy(s);
