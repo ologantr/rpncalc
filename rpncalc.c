@@ -300,8 +300,10 @@ static int is_valid_int(char *buf, int buf_len)
 
 static int parse_buf(char *buf, struct rpn_cmd *cmd)
 {
+        int buf_len = (int) strlen(buf);
+
         /* the user pressed only enter */
-        if (*buf == 0)
+        if (!buf_len)
                 return -1;
 
         /* check for a command like drop and quit */
@@ -317,12 +319,14 @@ static int parse_buf(char *buf, struct rpn_cmd *cmd)
         /* check for both an op and a signed number */
         if (*buf == '+' || *buf == '-')
         {
-                if (strlen(buf) > 1)
+                if (buf_len > 1)
                 {
                         /* could be a positive/negative number
                          * prefixed with sign, check the input */
-                        if (is_valid_double(buf + 1, (int) (strlen(buf) - 1)))
+                        if (is_valid_double(buf + 1, buf_len - 1))
                                 cmd_double(cmd, buf);
+                        else
+                                return -1;
                 }
                 else
                 {
@@ -335,7 +339,7 @@ static int parse_buf(char *buf, struct rpn_cmd *cmd)
         else if (*buf == '*' || *buf == '/')
         {
                 /* check for non-valid things like *3 */
-                if (strlen(buf) > 1)
+                if (buf_len > 1)
                         return -1;
 
                 /* here we are sure that this is an op */
@@ -344,7 +348,7 @@ static int parse_buf(char *buf, struct rpn_cmd *cmd)
 
         else
         {
-                int last_char_index = (int) (strlen(buf) - 1), times;
+                int last_char_index = buf_len - 1, times;
                 /* here could be a number or a multiple command like 3+, 4- */
                 if (is_valid_double(buf, last_char_index + 1))
                         /* this is a double */
