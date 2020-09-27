@@ -415,8 +415,8 @@ int main(int argc, char *argv[])
         char buf[STDIN_BUF_SIZE];
         int retval, interactive;
 
-        if (argc == 1) interactive = 0;
-        else if (argc == 2 && strcmp(argv[1], "-i") == 0) interactive = 1;
+        if (argc == 1) interactive = 1;
+        else if (argc == 2 && strcmp(argv[1], "-b") == 0) interactive = 0;
         else
         {
                 stack_destroy(s);
