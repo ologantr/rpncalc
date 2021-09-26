@@ -378,7 +378,7 @@ static int parse_token(char *tok, struct rpn_cmd *cmd)
 static int exec_line(struct stack *s, char *buf)
 {
         char *tok;
-        struct rpn_cmd cmd;
+        struct rpn_cmd cmd = { { 0.0f }, 0, 0 };
         int ret;
 
         for (tok = strtok(buf, " "); tok; tok = strtok(NULL, " "))
