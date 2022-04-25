@@ -26,6 +26,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <list>
+#include <memory>
+#include <algorithm>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -57,165 +60,23 @@ struct rpn_cmd
         enum rpn_type t;
 };
 
-struct stack_node
-{
-        int ptr;
-        double val[STACK_NODE_ELEMENTS_NUM];
-        struct stack_node *prev;
-        struct stack_node *next;
-};
-
-struct stack
-{
-        struct stack_node *first;
-        struct stack_node *last;
-        int count;
-};
-
-static struct stack_node* stack_alloc_node(void)
-{
-        struct stack_node *n;
-
-        if ((n = malloc(sizeof(struct stack_node))) == NULL)
-        {
-                puts("malloc failed");
-                exit(-1);
-        }
-
-        return n;
-}
-
-/* heap-allocated, free it after */
-static struct stack* stack_init(void)
-{
-        struct stack *s;
-        struct stack_node *n = stack_alloc_node();
-
-        if ((s = malloc(sizeof(struct stack))) == NULL)
-        {
-                puts("malloc failed");
-                exit(-1);
-        }
-
-        n->prev = NULL;
-        n->next = NULL;
-
-        /* empty stack type - ptr is the index of the first empty spot
-         * also this is the number of elements in the node */
-        n->ptr = 0;
-
-        s->first = n;
-        s->last = n;
-        s->count = 0;
-
-        return s;
-}
-
-static void stack_push(struct stack *s, double k)
-{
-        if (s->last->ptr == STACK_NODE_ELEMENTS_NUM)
-        {
-                /* the last node is full, allocate a new one */
-                struct stack_node *n = stack_alloc_node();
-                n->ptr = 0;
-                n->prev = s->last;
-                n->next = NULL;
-                s->last->next = n;
-                s->last = n;
-        }
-
-        s->last->val[(s->last->ptr)++] = k;
-        ++(s->count);
-        return;
-}
-
-static int stack_pop(struct stack *s, double *ret)
-{
-        if (s->count == 0) return 0;
-
-        if (s->last->ptr == 0)
-        {
-                /* the last node is empty, free it and look to the previous one */
-                struct stack_node *del = s->last;
-
-                s->last->prev->next = NULL;
-                s->last = s->last->prev;
-                free(del);
-        }
-
-        --(s->count);
-
-        if (ret == NULL)
-                /* no need to save the value */
-                --(s->last->ptr);
-        else
-                *ret = s->last->val[--(s->last->ptr)];
-
-        return 1;
-}
-
-static void stack_clear(struct stack *s)
-{
-        /* must free every node other than the first */
-        struct stack_node *ptr_1 = s->first->next, *ptr_2 = NULL;
-
-        if (ptr_1 != NULL)
-        {
-                ptr_2 = ptr_1->next;
-
-                while (ptr_2 != NULL)
-                {
-                        free(ptr_1);
-                        ptr_1 = ptr_2;
-                        ptr_2 = ptr_2->next;
-                }
-        }
-
-        s->first->ptr = 0;
-        s->first->next = NULL;
-}
-
-static void stack_destroy(struct stack *s)
-{
-        struct stack_node *ptr_1 = s->first, *ptr_2 = s->first->next;
-
-        while (ptr_2 != NULL)
-        {
-                free(ptr_1);
-                ptr_1 = ptr_2;
-                ptr_2 = ptr_2->next;
-        }
-
-        free(s);
-}
-
-static void stack_print(struct stack *s)
-{
-        for (struct stack_node *ptr = s->first; ptr != NULL; ptr = ptr->next)
-                for (int i = 0; i < ptr->ptr; ++i)
-                        printf("%f\n", ptr->val[i]);
-}
-
-static void exec_op(struct stack *s, enum rpn_op op, int times)
+static void exec_op(std::unique_ptr<std::list<double>> &s,
+                    enum rpn_op op, int times)
 {
         double x, y, res;
 
         if (times == 0)
                 /* apply the op for all elements */
-                times = s->count - 1;
+                times = s->size() - 1;
 
         for (int i = 0; i < times; ++i)
         {
-                if (s->count <= 1) return;
+                if (s->size() <= 1) return;
 
-                /* check for empty stack */
-                if(!stack_pop(s, &res))
-                        return;
-                x = res;
-
-                if(!stack_pop(s, &res))
-                        return;
-                y = res;
+                x = s->back();
+                s->pop_back();
+                y = s->back();
+                s->pop_back();
 
                 switch(op)
                 {
@@ -239,7 +100,7 @@ static void exec_op(struct stack *s, enum rpn_op op, int times)
                         break;
                 }
 
-                stack_push(s, res);
+                s->push_back(res);
         }
 }
 
@@ -288,6 +149,7 @@ static int is_valid_double(char *buf, int buf_len)
 
         return 1;
 }
+
 
 static int is_valid_int(char *buf, int buf_len)
 {
@@ -375,10 +237,12 @@ static int parse_token(char *tok, struct rpn_cmd *cmd)
         return 0;
 }
 
-static int exec_line(struct stack *s, char *buf)
+static int exec_line(std::unique_ptr<std::list<double>> &s,
+                     char *buf)
 {
         char *tok;
-        struct rpn_cmd cmd = { { 0.0f }, 0, 0 };
+        struct rpn_cmd cmd;
+        memset(&cmd, 0, sizeof(rpn_cmd));
         int ret;
 
         for (tok = strtok(buf, " "); tok; tok = strtok(NULL, " "))
@@ -389,39 +253,44 @@ static int exec_line(struct stack *s, char *buf)
                 switch(cmd.t)
                 {
                 case DOUBLE:
-                        stack_push(s, cmd.data.val);
+                        s->push_back(cmd.data.val);
                         break;
                 case OP:
                         if (cmd.op_times == 0)
-                                exec_op(s, cmd.data.op, s->count - 1);
+                                exec_op(s, cmd.data.op, s->size() - 1);
                         else
                                 exec_op(s, cmd.data.op, cmd.op_times);
                         break;
                 case DROP:
-                        stack_pop(s, NULL);
+                        s->pop_back();
                         break;
                 case CLEAR:
-                        stack_clear(s);
+                        s->clear();
                         break;
                 }
+
         }
 
         return 1;
 }
 
+static void stack_print(std::unique_ptr<std::list<double>> &s)
+{
+        std::for_each(s->begin(), s->end(),
+                      [](double d) { printf("%f\n", d); });
+}
+
 int main(int argc, char *argv[])
 {
-        struct stack *s = stack_init();
+        std::unique_ptr<std::list<double>> s =
+                std::make_unique<std::list<double>>();
         char buf[STDIN_BUF_SIZE];
         int retval, interactive;
 
         if (argc == 1) interactive = 1;
         else if (argc == 2 && strcmp(argv[1], "-b") == 0) interactive = 0;
         else
-        {
-                stack_destroy(s);
                 return 0;
-        }
 
         if (interactive) printf("> ");
 
@@ -454,6 +323,5 @@ int main(int argc, char *argv[])
         if (interactive) putchar('\r');
         else stack_print(s);
 
-        stack_destroy(s);
         return 0;
 }
