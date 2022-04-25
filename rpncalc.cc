@@ -33,7 +33,6 @@
 #include <iomanip>
 #include <cctype>
 #include <string>
-#include <string.h>
 
 enum rpn_op { SUM = 0, SUB, MUL, DIV };
 enum rpn_type { DOUBLE = 0, OP, DROP, CLEAR };
@@ -293,11 +292,10 @@ static int exec_line(std::unique_ptr<PrintableDoubleStack> &s,
                      std::unique_ptr<std::string> &buf)
 {
         std::string tmp;
-        struct rpn_cmd cmd;
-        int ret;
+        struct rpn_cmd cmd = {};
+        int ret = 0;
         size_t current, next = -1;
 
-        memset(&cmd, 0, sizeof(rpn_cmd));
         do
         {
                 current = next + 1;
@@ -339,13 +337,12 @@ int main(int argc, char *argv[])
         int retval, interactive;
 
         if (argc == 1) interactive = 1;
-        else if (argc == 2 && strcmp(argv[1], "-b") == 0) interactive = 0;
+        else if (argc == 2 && std::string(argv[1]) == "-b") interactive = 0;
         else
                 return 0;
 
         if (interactive) std::cout << "> ";
 
-        /* main loop */
         while(std::getline(std::cin, *buf))
         {
                 retval = exec_line(s, buf);
