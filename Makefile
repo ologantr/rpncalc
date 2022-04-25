@@ -32,4 +32,4 @@ TARGET := rpncalc
 all: $(TARGET)
 
 clean:
-	rm $(TARGET)
+	rm -f $(TARGET)
