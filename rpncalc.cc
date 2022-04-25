@@ -38,6 +38,61 @@
 enum rpn_op { SUM = 0, SUB, MUL, DIV };
 enum rpn_type { DOUBLE = 0, OP, DROP, CLEAR };
 
+class PrintableDoubleStack
+{
+        private:
+                std::list<double> *stack;
+
+        public:
+                PrintableDoubleStack();
+                ~PrintableDoubleStack();
+                void print();
+                void push(double& val);
+                double pop();
+                size_t size();
+                void clear();
+};
+
+PrintableDoubleStack::PrintableDoubleStack()
+{
+        stack = new std::list<double>;
+}
+
+PrintableDoubleStack::~PrintableDoubleStack()
+{
+        delete stack;
+}
+
+void PrintableDoubleStack::print()
+{
+        std::for_each(stack->begin(), stack->end(),
+                      [](double d) { std::cout << std::fixed
+                                               << std::setprecision(6)
+                                               << d << std::endl; });
+}
+
+void PrintableDoubleStack::push(double& val)
+{
+        stack->push_back(val);
+}
+
+size_t PrintableDoubleStack::size()
+{
+        return stack->size();
+}
+
+void PrintableDoubleStack::clear()
+{
+        stack->clear();
+}
+
+double PrintableDoubleStack::pop()
+{
+        double tmp = stack->back();
+        stack->pop_back();
+        return tmp;
+}
+
 struct
 {
         char cmd[10];
@@ -58,7 +113,7 @@ struct rpn_cmd
         enum rpn_type t;
 };
 
-static void exec_op(std::unique_ptr<std::list<double>> &s,
+static void exec_op(std::unique_ptr<PrintableDoubleStack> &s,
                     enum rpn_op op, int times)
 {
         double x, y, res;
@@ -71,10 +126,8 @@ static void exec_op(std::unique_ptr<std::list<double>> &s,
         {
                 if (s->size() <= 1) return;
 
-                x = s->back();
-                s->pop_back();
-                y = s->back();
-                s->pop_back();
+                x = s->pop();
+                y = s->pop();
 
                 switch(op)
                 {
@@ -99,7 +152,7 @@ static void exec_op(std::unique_ptr<std::list<double>> &s,
                         break;
                 }
 
-                s->push_back(res);
+                s->push(res);
         }
 }
 
@@ -236,7 +289,7 @@ static int parse_token(std::string *tok, struct rpn_cmd *cmd)
         return 0;
 }
 
-static int exec_line(std::unique_ptr<std::list<double>> &s,
+static int exec_line(std::unique_ptr<PrintableDoubleStack> &s,
                      std::unique_ptr<std::string> &buf)
 {
         std::string tmp;
@@ -257,7 +310,7 @@ static int exec_line(std::unique_ptr<std::list<double>> &s,
                 switch(cmd.t)
                 {
                 case DOUBLE:
-                        s->push_back(cmd.data.val);
+                        s->push(cmd.data.val);
                         break;
                 case OP:
                         if (cmd.op_times == 0)
@@ -266,7 +319,7 @@ static int exec_line(std::unique_ptr<std::list<double>> &s,
                                 exec_op(s, cmd.data.op, cmd.op_times);
                         break;
                 case DROP:
-                        s->pop_back();
+                        s->pop();
                         break;
                 case CLEAR:
                         s->clear();
@@ -277,18 +330,10 @@ static int exec_line(std::unique_ptr<std::list<double>> &s,
         return 1;
 }
 
-static void stack_print(std::unique_ptr<std::list<double>> &s)
-{
-        std::for_each(s->begin(), s->end(),
-                      [](double d) { std::cout << std::fixed
-                                               << std::setprecision(6)
-                                               << d << std::endl; });
-}
-
 int main(int argc, char *argv[])
 {
-        std::unique_ptr<std::list<double>> s =
-                std::make_unique<std::list<double>>();
+        std::unique_ptr<PrintableDoubleStack> s =
+                std::make_unique<PrintableDoubleStack>();
         std::unique_ptr<std::string> buf =
                 std::make_unique<std::string>();
         int retval, interactive;
@@ -318,13 +363,13 @@ int main(int argc, char *argv[])
 
                 if (interactive)
                 {
-                        stack_print(s);
+                        s->print();
                         std::cout << "> ";
                 }
         }
 
         if (interactive) std::cout << '\r';
-        else stack_print(s);
+        else s->print();
 
         return 0;
 }
