@@ -29,13 +29,11 @@
 #include <list>
 #include <memory>
 #include <algorithm>
-#include <stdio.h>
-#include <stdlib.h>
+#include <iostream>
+#include <iomanip>
+#include <cctype>
+#include <string>
 #include <string.h>
-#include <ctype.h>
-
-#define STDIN_BUF_SIZE 1024
-#define STACK_NODE_ELEMENTS_NUM 10
 
 enum rpn_op { SUM = 0, SUB, MUL, DIV };
 enum rpn_type { DOUBLE = 0, OP, DROP, CLEAR };
@@ -92,7 +90,8 @@ static void exec_op(std::unique_ptr<std::list<double>> &s,
                 case DIV:
                         if (x == 0)
                         {
-                                puts("error - division by zero");
+                                std::cout << "error - division by zero"
+                                        << std::endl;
                                 return;
                         }
 
@@ -126,15 +125,15 @@ static void cmd_op(struct rpn_cmd *cmd, int times, char f_char_buf)
         }
 }
 
-static void cmd_double(struct rpn_cmd *cmd, char *buf)
+static void cmd_double(struct rpn_cmd *cmd, std::string buf)
 {
         cmd->t = DOUBLE;
-        cmd->data.val = strtod(buf, NULL);
+        cmd->data.val = std::stod(buf);
 }
 
-static int is_valid_double(char *buf, int buf_len)
+static int is_valid_double(std::string buf)
 {
-        for (int i = 0, p = 0; i < buf_len; ++i)
+        for (size_t i = 0, p = 0; i < buf.size(); ++i)
         {
                 if (buf[i] == '.' && !p)
                 {
@@ -151,17 +150,17 @@ static int is_valid_double(char *buf, int buf_len)
 }
 
 
-static int is_valid_int(char *buf, int buf_len)
+static int is_valid_int(std::string buf, int last)
 {
-        for (int i = 0; i < buf_len; ++i)
+        for (int i = 0; i < last; ++i)
                 if(!isdigit(buf[i]))
                         return 0;
         return 1;
 }
 
-static int parse_token(char *tok, struct rpn_cmd *cmd)
+static int parse_token(std::string *tok, struct rpn_cmd *cmd)
 {
-        int tok_len = (int) strlen(tok);
+        int tok_len = tok->size();
 
         /* the user pressed only enter */
         if (!tok_len)
@@ -170,7 +169,7 @@ static int parse_token(char *tok, struct rpn_cmd *cmd)
         /* check for a command like drop and quit */
         for (int i = 0; i < NCMD; ++i)
         {
-                if (strncmp(tok, rpn_commands[i].cmd, STDIN_BUF_SIZE) == 0)
+                if(tok->compare(rpn_commands[i].cmd) == 0)
                 {
                         cmd->t = rpn_commands[i].cmd_type;
                         return 0;
@@ -178,55 +177,55 @@ static int parse_token(char *tok, struct rpn_cmd *cmd)
         }
 
         /* check for both an op and a signed number */
-        if (*tok == '+' || *tok == '-')
+        if (tok->front() == '+' || tok->front() == '-')
         {
                 if (tok_len > 1)
                 {
                         /* could be a positive/negative number
                          * prefixed with sign, check the input */
-                        if (is_valid_double(tok + 1, tok_len - 1))
-                                cmd_double(cmd, tok);
+                        if (is_valid_double(tok->substr(1, tok->size() - 1)))
+                                cmd_double(cmd, *tok);
                         else
                                 return -1;
                 }
                 else
                 {
                         /* this is an op */
-                        cmd_op(cmd, 1, *tok);
+                        cmd_op(cmd, 1, tok->front());
                 }
         }
 
         /* check for the remaining ops */
-        else if (*tok == '*' || *tok == '/')
+        else if (tok->front() == '*' || tok->front() == '/')
         {
                 /* check for non-valid things like *3 */
                 if (tok_len > 1)
                         return -1;
 
                 /* here we are sure that this is an op */
-                cmd_op(cmd, 1, *tok);
+                cmd_op(cmd, 1, tok->front());
         }
 
         else
         {
                 int last_char_index = tok_len - 1, times;
                 /* here could be a number or a multiple command like 3+, 4- */
-                if (is_valid_double(tok, last_char_index + 1))
+                if (is_valid_double(tok->substr(0, last_char_index + 1)))
                         /* this is a double */
-                        cmd_double(cmd, tok);
+                        cmd_double(cmd, *tok);
                 /* if the last char is an op and this is an int,
                  * it is a multiple command */
-                else if ((tok[last_char_index] == '+' ||
-                          tok[last_char_index] == '-' ||
-                          tok[last_char_index] == '*' ||
-                          tok[last_char_index] == '/') &&
+                else if ((tok->at(last_char_index) == '+' ||
+                          tok->at(last_char_index) == '-' ||
+                          tok->at(last_char_index) == '*' ||
+                          tok->at(last_char_index) == '/') &&
                          /* strlen(tok) - 1 so we do not consider
                           * the final op */
-                         is_valid_int(tok, last_char_index))
+                         is_valid_int(*tok, last_char_index))
                 {
                         /* we have a multiple op */
-                        times = (int) strtol(tok, NULL, 10);
-                        cmd_op(cmd, times, tok[last_char_index]);
+                        times = std::stol(*tok);
+                        cmd_op(cmd, times, tok->at(last_char_index));
                 }
 
                 else
@@ -238,16 +237,21 @@ static int parse_token(char *tok, struct rpn_cmd *cmd)
 }
 
 static int exec_line(std::unique_ptr<std::list<double>> &s,
-                     char *buf)
+                     std::unique_ptr<std::string> &buf)
 {
-        char *tok;
+        std::string tmp;
         struct rpn_cmd cmd;
-        memset(&cmd, 0, sizeof(rpn_cmd));
         int ret;
+        size_t current, next = -1;
 
-        for (tok = strtok(buf, " "); tok; tok = strtok(NULL, " "))
+        memset(&cmd, 0, sizeof(rpn_cmd));
+        do
         {
-                if((ret = parse_token(tok, &cmd)) == -1)
+                current = next + 1;
+                next = buf->find_first_of(" ", current);
+                tmp = buf->substr(current, next - current);
+
+                if((ret = parse_token(&tmp, &cmd)) == -1)
                         return ret;
 
                 switch(cmd.t)
@@ -268,8 +272,7 @@ static int exec_line(std::unique_ptr<std::list<double>> &s,
                         s->clear();
                         break;
                 }
-
-        }
+        } while(next != std::string::npos);
 
         return 1;
 }
@@ -277,14 +280,17 @@ static int exec_line(std::unique_ptr<std::list<double>> &s,
 static void stack_print(std::unique_ptr<std::list<double>> &s)
 {
         std::for_each(s->begin(), s->end(),
-                      [](double d) { printf("%f\n", d); });
+                      [](double d) { std::cout << std::fixed
+                                               << std::setprecision(6)
+                                               << d << std::endl; });
 }
 
 int main(int argc, char *argv[])
 {
         std::unique_ptr<std::list<double>> s =
                 std::make_unique<std::list<double>>();
-        char buf[STDIN_BUF_SIZE];
+        std::unique_ptr<std::string> buf =
+                std::make_unique<std::string>();
         int retval, interactive;
 
         if (argc == 1) interactive = 1;
@@ -292,20 +298,17 @@ int main(int argc, char *argv[])
         else
                 return 0;
 
-        if (interactive) printf("> ");
+        if (interactive) std::cout << "> ";
 
         /* main loop */
-        while(fgets(buf, STDIN_BUF_SIZE, stdin) != NULL)
+        while(std::getline(std::cin, *buf))
         {
-                /* remove trailing newline */
-                buf[strlen(buf) - 1] = 0;
-
                 retval = exec_line(s, buf);
 
                 switch(retval)
                 {
                 case -1:
-                        puts("error\n");
+                        std::cout << "error" << std::endl;
                         break;
                 case 0:
                         return 0;
@@ -316,11 +319,11 @@ int main(int argc, char *argv[])
                 if (interactive)
                 {
                         stack_print(s);
-                        printf("> ");
+                        std::cout << "> ";
                 }
         }
 
-        if (interactive) putchar('\r');
+        if (interactive) std::cout << '\r';
         else stack_print(s);
 
         return 0;
